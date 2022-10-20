@@ -9,6 +9,8 @@ python_version = "3.10"
 [packages]
 bs4 = "*"
 ebooklib = "*"
+lxml = "*"
+requests = "*"
 
 [dev-packages]
 black = "*"
