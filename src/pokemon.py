@@ -73,7 +73,7 @@ def get_pokemon() -> List[Pokemon]:
         if os.path.isfile(json_filepath):
             p = Pokemon.parse_file(json_filepath)
             pokemon.append(p)
-            logging.info(f"Loaded {p.json_filepath}.")
+            logging.debug(f"Loaded {p.json_filepath}.")
             continue
 
         index = table_row_soup.find_next("td").next_sibling.next_sibling.text.strip()
@@ -97,6 +97,7 @@ def get_pokemon() -> List[Pokemon]:
     # Filter out speculative Pokemon
     pokemon = [p for p in pokemon if not p.description.startswith("This article's contents will change")]
 
+    logging.info("Loaded Pokemon.")
     return pokemon
 
 

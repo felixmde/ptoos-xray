@@ -5,6 +5,9 @@ __pycache__/
 *$py.class
 .vscode
 pokemon
+tmp
+poos.epub
+test.epub
 
 # C extensions
 *.so
