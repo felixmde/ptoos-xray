@@ -42,7 +42,7 @@ def patch_chapter(chapter: epub.EpubHtml, pokemon_lookup: Dict[str, Pokemon]):
         tag = soup.new_tag("a")
         tag.string = word
         tag.attrs["href"] = f"np_pokedex.xhtml#{POKEMON_ID_PREFIX}{key}"
-        # tag.attrs["style"] = "color:black;text-decoration:none"
+        tag.attrs["style"] = "color:black;text-decoration:none"
         return tag
 
     def patch_string(section: NavigableString) -> List:

@@ -16,6 +16,6 @@ def main():
     try:
         ptoos_epub = sys.argv[1]
     except IndexError:
-        ptoos_epub = "poos.epub"
+        ptoos_epub = "ptoos.epub"
     pokemon = src.pokemon.get_pokemon()
     src.epub.patch(ptoos_epub, pokemon)
