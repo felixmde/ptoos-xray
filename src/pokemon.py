@@ -97,7 +97,7 @@ def get_pokemon() -> List[Pokemon]:
     # Filter out speculative Pokemon
     pokemon = [p for p in pokemon if not p.description.startswith("This article's contents will change")]
 
-    logging.info("Loaded Pokemon.")
+    logging.info("Pokemon loaded.")
     return pokemon
 
 
