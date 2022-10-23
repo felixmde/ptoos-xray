@@ -2,6 +2,7 @@ import requests
 import sys
 import os
 import logging
+from rich.progress import track
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
 from typing import List
@@ -23,6 +24,7 @@ class Pokemon(BaseModel):
     img_filepath: str
     json_filepath: str
     description: str = ""
+    appears_in_book: bool = False
 
 
 def download_to_file(url: str, filepath: str, override=False):
@@ -65,7 +67,7 @@ def get_pokemon() -> List[Pokemon]:
         table_row_soups += tbody_soup.find_all("tr", recursive=False)[1:]
 
     pokemon = []
-    for table_row_soup in table_row_soups:
+    for table_row_soup in track(table_row_soups, description="Download Pokemon"):
         name = table_row_soup.find_next("th").next_element.attrs["title"]
 
         # ignore Galarian and Alolan Pokemon so
@@ -101,7 +103,7 @@ def get_pokemon() -> List[Pokemon]:
         extend_pokemon(p)
         with open(p.json_filepath, "w") as f:
             f.write(p.json())
-            logging.info(f"Saved {p.json_filepath}.")
+            logging.debug(f"Saved {p.json_filepath}.")
 
     # Filter out speculative Pokemon
     pokemon = [
@@ -110,7 +112,6 @@ def get_pokemon() -> List[Pokemon]:
         if not p.description.startswith("This article's contents will change")
     ]
 
-    logging.info("Pokemon loaded.")
     return pokemon
 
 
