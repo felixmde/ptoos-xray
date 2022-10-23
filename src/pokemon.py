@@ -9,7 +9,9 @@ from typing import List
 
 POKEMON_CACHE_DIRECTORY = "pokemon"
 BULBAPEDIA_BASE_URL = "https://bulbapedia.bulbagarden.net"
-NATIONAL_INDEX_URL = BULBAPEDIA_BASE_URL + "/wiki/List_of_Pok%C3%A9mon_by_National_Pok%C3%A9dex_number"
+NATIONAL_INDEX_URL = (
+    BULBAPEDIA_BASE_URL + "/wiki/List_of_Pok%C3%A9mon_by_National_Pok%C3%A9dex_number"
+)
 
 
 class Pokemon(BaseModel):
@@ -24,13 +26,13 @@ class Pokemon(BaseModel):
 
 
 def download_to_file(url: str, filepath: str, override=False):
-    """ Downloads url into filepath. """
+    """Downloads url into filepath."""
     if os.path.isfile(filepath) and override is False:
         logging.debug(f"'{filepath}' exists.")
         return
 
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0'
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0"
     }
     r = requests.get(url, headers=headers)
     if r.status_code != 200:
@@ -45,12 +47,14 @@ def download_to_file(url: str, filepath: str, override=False):
 
 
 def get_pokemon() -> List[Pokemon]:
-    """ Scrape Pokemon from the Bulbapedia national dex """
+    """Scrape Pokemon from the Bulbapedia national dex"""
     NATIONAL_INDEX_FILEPATH = os.path.join(POKEMON_CACHE_DIRECTORY, "pokedex.html")
     download_to_file(NATIONAL_INDEX_URL, NATIONAL_INDEX_FILEPATH)
     with open(NATIONAL_INDEX_FILEPATH, "r") as r:
         soup = BeautifulSoup(r, "html.parser")
-    pokemon_list_soup: BeautifulSoup = soup.find(id="List_of_Pokémon_by_National_Pokédex_number").parent
+    pokemon_list_soup: BeautifulSoup = soup.find(
+        id="List_of_Pokémon_by_National_Pokédex_number"
+    ).parent
     generation_soups: BeautifulSoup = pokemon_list_soup.find_next_siblings("h3")
 
     table_row_soups = []
@@ -77,48 +81,58 @@ def get_pokemon() -> List[Pokemon]:
             continue
 
         index = table_row_soup.find_next("td").next_sibling.next_sibling.text.strip()
-        html_url = BULBAPEDIA_BASE_URL + table_row_soup.find_next("th").next_element.attrs["href"]
+        html_url = (
+            BULBAPEDIA_BASE_URL
+            + table_row_soup.find_next("th").next_element.attrs["href"]
+        )
         img_url = table_row_soup.find("img").attrs["src"]
         html_filepath = os.path.join(POKEMON_CACHE_DIRECTORY, name.lower() + ".html")
         img_filepath = os.path.join(POKEMON_CACHE_DIRECTORY, name.lower() + ".png")
-        p = Pokemon(name=name,
-                    index=index,
-                    html_url=html_url,
-                    img_url=img_url,
-                    html_filepath=html_filepath,
-                    img_filepath=img_filepath,
-                    json_filepath=json_filepath)
+        p = Pokemon(
+            name=name,
+            index=index,
+            html_url=html_url,
+            img_url=img_url,
+            html_filepath=html_filepath,
+            img_filepath=img_filepath,
+            json_filepath=json_filepath,
+        )
         pokemon.append(p)
         extend_pokemon(p)
-        with open(p.json_filepath, 'w') as f:
+        with open(p.json_filepath, "w") as f:
             f.write(p.json())
             logging.info(f"Saved {p.json_filepath}.")
 
     # Filter out speculative Pokemon
-    pokemon = [p for p in pokemon if not p.description.startswith("This article's contents will change")]
+    pokemon = [
+        p
+        for p in pokemon
+        if not p.description.startswith("This article's contents will change")
+    ]
 
     logging.info("Pokemon loaded.")
     return pokemon
 
 
 def extend_pokemon(p: Pokemon):
-    """ Add description and download Pokemon image """
+    """Add description and download Pokemon image"""
     download_to_file(p.html_url, p.html_filepath)
     with open(p.html_filepath, "r") as r:
         soup = BeautifulSoup(r, "html.parser")
-    content_soup: BeautifulSoup = soup.find(id='mw-content-text').contents[0]
+    content_soup: BeautifulSoup = soup.find(id="mw-content-text").contents[0]
 
     # description
     p_soup = content_soup.find("p")
     description = []
-    while p_soup.name == 'p':
+    while p_soup.name == "p":
         description.append(p_soup.get_text())
         p_soup = p_soup.next_sibling
     p.description = "".join(description)
 
     # image
-    img_url = content_soup.find("table").find_next_sibling("table").find("img").attrs["src"]
+    img_url = (
+        content_soup.find("table").find_next_sibling("table").find("img").attrs["src"]
+    )
     img_url = img_url.replace("//", "https://")
     p.img_url = img_url
     download_to_file(img_url, p.img_filepath)
-

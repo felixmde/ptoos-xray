@@ -1,13 +1,15 @@
+import sys
 import logging
 import src.pokemon
 import src.epub
 
 
-def init_logging():
-    logging.basicConfig(level=logging.INFO)
-
-
 def main():
-    init_logging()
+    logging.basicConfig(format="%(message)s", level=logging.INFO)
+    try:
+        ptoos_epub = sys.argv[1]
+    except IndexError:
+        ptoos_epub = "poos.epub"
+    logging.info(f"Patching '{ptoos_epub}'.")
     pokemon = src.pokemon.get_pokemon()
-    src.epub.patch("poos.epub", pokemon)
+    src.epub.patch(ptoos_epub, pokemon)

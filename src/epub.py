@@ -9,24 +9,27 @@ from typing import List, Dict
 
 POKEMON_ID_PREFIX = "pokemon-id-"
 
+
 def create_pokedex_chapter(pokemon: List[Pokemon]) -> epub.EpubHtml:
     POKEDEX_TITLE = "Pokedex"
     POKEDEX_FILE = "content/np_pokedex.xhtml"
     POKEDEX_UID = "np_pokedex"
-    chapter = epub.EpubHtml(title=POKEDEX_TITLE, file_name=POKEDEX_FILE, uid=POKEDEX_UID)
-    content = ['<h1>Pokedex</h1>']
+    chapter = epub.EpubHtml(
+        title=POKEDEX_TITLE, file_name=POKEDEX_FILE, uid=POKEDEX_UID
+    )
+    content = ["<h1>Pokedex</h1>"]
 
     for p in pokemon:
         content.append(f'<h2 id="{POKEMON_ID_PREFIX}{p.name.lower()}">{p.name}</h2>')
-        content.append(f'  <p><img alt="[Pokemon {p.name}]" src="../{p.img_filepath}"/><br/></p>')
+        content.append(
+            f'  <p><img alt="[Pokemon {p.name}]" src="../{p.img_filepath}"/><br/></p>'
+        )
         for paragraph in p.description.split("\n"):
-            content.append(f'  <p>{paragraph}</p>')
-        content.append('')
+            content.append(f"  <p>{paragraph}</p>")
+        content.append("")
 
     chapter.content = "\n".join(content)
     return chapter
-
-
 
 
 def patch_chapter(chapter: epub.EpubHtml, pokemon_lookup: Dict[str, Pokemon]):
@@ -41,8 +44,8 @@ def patch_chapter(chapter: epub.EpubHtml, pokemon_lookup: Dict[str, Pokemon]):
         return tag
 
     def patch_string(section: NavigableString) -> List:
-        """ Replace Pokemon with link to Pokemon; requires splitting up the
-            NavigableString into a list of NavigableStrings and Tags. """
+        """Replace Pokemon with link to Pokemon; requires splitting up the
+        NavigableString into a list of NavigableStrings and Tags."""
         result = [[]]
         for word in str(section).split(" "):
             word_stripped = r.sub("", word)
@@ -55,7 +58,9 @@ def patch_chapter(chapter: epub.EpubHtml, pokemon_lookup: Dict[str, Pokemon]):
                 else:
                     # add other chars before pokemon if there are any
                     result[-1].append("".join(word_split[:i]))
-                pokemon_link = pokemon_name_to_link(word_stripped.lower(), word_stripped)
+                pokemon_link = pokemon_name_to_link(
+                    word_stripped.lower(), word_stripped
+                )
                 result.append(pokemon_link)
                 result.append([])
                 if i + 1 == len(word_split):
@@ -63,7 +68,7 @@ def patch_chapter(chapter: epub.EpubHtml, pokemon_lookup: Dict[str, Pokemon]):
                     result[-1].append(" ")
                 else:
                     # add other chars after pokemon if there are any
-                    result[-1].append("".join(word_split[i + 1:]))
+                    result[-1].append("".join(word_split[i + 1 :]))
             else:
                 result[-1].append(word)
 
@@ -96,20 +101,28 @@ def patch(epub_filepath: str, pokemon: List[Pokemon]):
     book.add_item(chapter)
     link = epub.Link(chapter.file_name, chapter.title, chapter.id)
     book.toc.append(link)
-    book.spine.append((chapter.id, 'yes'))
+    book.spine.append((chapter.id, "yes"))
 
     for p in pokemon:
-        image_content = open(p.img_filepath, 'rb').read()
-        img = epub.EpubItem(uid=p.name, file_name=p.img_filepath, media_type='image/png', content=image_content)
+        image_content = open(p.img_filepath, "rb").read()
+        img = epub.EpubItem(
+            uid=p.name,
+            file_name=p.img_filepath,
+            media_type="image/png",
+            content=image_content,
+        )
         book.add_item(img)
 
     pokemon_lookup = {p.name.lower(): p for p in pokemon}
-    chapters = [b for b in book.get_items()
-                if isinstance(b, epub.EpubHtml)
-                if b.id.startswith("np_")]
+    chapters = [
+        b
+        for b in book.get_items()
+        if isinstance(b, epub.EpubHtml)
+        if b.id.startswith("np_")
+    ]
     for c in chapters:
         patch_chapter(c, pokemon_lookup)
 
     epub_out = epub_filepath.replace(".", "-with-links.")
     epub.write_epub(epub_out, book, {})
-    logging.info(f"{epub_out} written.")
+    logging.info(f"Write '{epub_out}'.")
