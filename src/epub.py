@@ -11,12 +11,12 @@ from rich.progress import track
 from rich.console import Console
 
 POKEMON_ID_PREFIX = "pokemon-id-"
+POKEDEX_UID = "np_pokedex"
 
 
 def create_pokedex_chapter(pokemon: List[Pokemon]) -> epub.EpubHtml:
     POKEDEX_TITLE = "Pokedex"
     POKEDEX_FILE = "content/np_pokedex.xhtml"
-    POKEDEX_UID = "np_pokedex"
     chapter = epub.EpubHtml(
         title=POKEDEX_TITLE, file_name=POKEDEX_FILE, uid=POKEDEX_UID
     )
@@ -95,6 +95,11 @@ def patch(epub_filename: str, pokemon: List[Pokemon]):
         if isinstance(b, epub.EpubHtml)
         if b.id.startswith("np_")
     ]
+
+    if [c for c in chapters if c.id == POKEDEX_UID]:
+        logging.warning(f"It looks like '{epub_filename}' already has a Pokedex.")
+        sys.exit(1)
+
     for c in track(chapters, description="Add Pokemon links to chapters"):
         patch_chapter(c, pokemon_lookup)
 
