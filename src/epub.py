@@ -1,6 +1,7 @@
 import ebooklib
 import logging
 import re
+import sys
 from bs4 import BeautifulSoup, Tag
 from bs4.element import NavigableString
 from ebooklib import epub
@@ -24,7 +25,7 @@ def create_pokedex_chapter(pokemon: List[Pokemon]) -> epub.EpubHtml:
     for p in pokemon:
         content.append(f'<h2 id="{POKEMON_ID_PREFIX}{p.name.lower()}">{p.name}</h2>')
         content.append(
-            f'  <p><img alt="[Pokemon {p.name}]" src="../{p.img_filepath}"/><br/></p>'
+            f'  <p><img alt="[Pokemon {p.name}]" src="../{p.img_filename}"/><br/></p>'
         )
         for paragraph in p.description.split("\n"):
             content.append(f"  <p>{paragraph}</p>")
@@ -80,8 +81,12 @@ def patch_chapter(chapter: epub.EpubHtml, pokemon_lookup: Dict[str, Pokemon]):
     chapter.content = str(soup)
 
 
-def patch(epub_filepath: str, pokemon: List[Pokemon]):
-    book = epub.read_epub(epub_filepath)
+def patch(epub_filename: str, pokemon: List[Pokemon]):
+    try:
+        book = epub.read_epub(epub_filename)
+    except Exception:
+        logging.exception("Failed to open epub.")
+        sys.exit(1)
 
     pokemon_lookup = {p.name.lower(): p for p in pokemon}
     chapters = [
@@ -103,17 +108,17 @@ def patch(epub_filepath: str, pokemon: List[Pokemon]):
     book.spine.append((chapter.id, "yes"))
 
     for p in pokemon:
-        image_content = open(p.img_filepath, "rb").read()
+        image_content = open(p.img_filename, "rb").read()
         img = epub.EpubItem(
             uid=p.name,
-            file_name=p.img_filepath,
+            file_name=p.img_filename,
             media_type="image/png",
             content=image_content,
         )
         book.add_item(img)
 
     console = Console()
-    epub_out = epub_filepath.replace(".", "-with-links.")
+    epub_out = epub_filename.replace(".", "-with-links.")
     with console.status(f"Writing {epub_out}"):
         epub.write_epub(epub_out, book, {})
     console.print(f"[green]✓[/green] [orange1]{epub_out}[/orange1] written")

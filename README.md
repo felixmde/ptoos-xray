@@ -5,8 +5,24 @@ to descriptions and pictures of the Pokemon within the e-book itself.
 
 It works with the epub that you can download from [Daystar Eld's Patreon](https://www.patreon.com/daystareld/).
 
+## Usage
+
 ```shell
+pip install --user pipenv
 pipenv install
 pipenv shell
 python ptoos-xray.py "DaystarEld - Pokemon The Origin of Species.epub"
 ```
+
+## Run tests
+
+```shell
+pipenv install --dev
+pipenv run pytest
+```
+
+## Credits
+
+Full credit for the Pokemon names, images, and descriptions goes to
+[Bulbapedia](https://bulbapedia.bulbagarden.net) under
+[Attribution-NonCommercial-ShareAlike 2.5](https://creativecommons.org/licenses/by-nc-sa/2.5/).

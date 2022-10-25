@@ -7,6 +7,7 @@ __pycache__/
 pokemon
 tmp
 ptoos.epub
+ptoos-with-links.epub
 
 # C extensions
 *.so

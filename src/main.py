@@ -11,11 +11,12 @@ def main():
         level=logging.INFO,
         format="%(message)s",
         datefmt="[%X]",
-        handlers=[RichHandler()],
+        handlers=[RichHandler(rich_tracebacks=True)],
     )
     try:
         ptoos_epub = sys.argv[1]
     except IndexError:
         ptoos_epub = "ptoos.epub"
+        logging.warning(f"No epub file provided. Defaulting to '{ptoos_epub}'.")
     pokemon = src.pokemon.get_pokemon()
     src.epub.patch(ptoos_epub, pokemon)
