@@ -57,7 +57,9 @@ def download_national_index_html(national_index_filename: str):
 def get_pokemon_table_row_soups(national_index_filename: str) -> List[BeautifulSoup]:
     with open(national_index_filename, "r") as r:
         soup = BeautifulSoup(r, "html.parser")
-    pokemon_list_soup = soup.find(id="List_of_Pokémon_by_National_Pokédex_number").parent
+    pokemon_list_soup = soup.find(
+        id="List_of_Pokémon_by_National_Pokédex_number"
+    ).parent
     generation_soups = pokemon_list_soup.find_next_siblings("h3")
     table_row_soups = []
     for generation_soup in generation_soups:
@@ -81,8 +83,7 @@ def extract_pokemon_from_table_row(table_row_soup: BeautifulSoup) -> Pokemon:
 
     index = table_row_soup.find_next("td").next_sibling.next_sibling.text.strip()
     html_url = (
-        BULBAPEDIA_BASE_URL
-        + table_row_soup.find_next("th").next_element.attrs["href"]
+        BULBAPEDIA_BASE_URL + table_row_soup.find_next("th").next_element.attrs["href"]
     )
     img_url = table_row_soup.find("img").attrs["src"]
     html_filename = os.path.join(POKEMON_CACHE_DIRECTORY, name.lower() + ".html")
@@ -105,7 +106,7 @@ def get_pokemon() -> List[Pokemon]:
         os.mkdir(POKEMON_CACHE_DIRECTORY)
     national_index_filename = os.path.join(POKEMON_CACHE_DIRECTORY, "pokedex.html")
     download_national_index_html(national_index_filename)
-    table_row_soups = get_pokemon_table_row_soups(national_index_filename) 
+    table_row_soups = get_pokemon_table_row_soups(national_index_filename)
 
     pokemon = []
     for table_row_soup in track(table_row_soups, description="Download Pokemon"):
@@ -152,7 +153,10 @@ def extend_pokemon(p: Pokemon):
 
     if not os.path.isfile(p.img_filename):
         img_url = (
-            content_soup.find("table").find_next_sibling("table").find("img").attrs["src"]
+            content_soup.find("table")
+            .find_next_sibling("table")
+            .find("img")
+            .attrs["src"]
         )
         img_url = img_url.replace("//", "https://")
         p.img_url = img_url
