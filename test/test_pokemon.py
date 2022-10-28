@@ -19,6 +19,7 @@ def test_extract_pokemon_from_table_row(tmp_path):
     row_soups = pokemon.get_pokemon_table_row_soups(national_index) 
     p = pokemon.extract_pokemon_from_table_row(row_soups[42])
     assert p.name == 'Vulpix'
+    assert p.link_id == 'vulpix'
     assert p.index == '#037'
     assert p.html_url == 'https://bulbapedia.bulbagarden.net/wiki/Vulpix_(Pok%C3%A9mon)'
     assert p.img_url == '//archives.bulbagarden.net/media/upload/thumb/3/35/037Vulpix-Alola.png/70px-037Vulpix-Alola.png'

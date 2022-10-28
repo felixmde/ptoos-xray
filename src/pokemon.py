@@ -2,6 +2,7 @@ import requests
 import sys
 import os
 import logging
+import re
 from rich.progress import track
 from pydantic import BaseModel
 from bs4 import BeautifulSoup
@@ -17,6 +18,7 @@ NATIONAL_INDEX_URL = (
 
 class Pokemon(BaseModel):
     name: str
+    link_id: str
     index: str
     html_url: str
     img_url: str
@@ -68,6 +70,7 @@ def get_pokemon_table_row_soups(national_index_filename: str) -> List[BeautifulS
 
 def extract_pokemon_from_table_row(table_row_soup: BeautifulSoup) -> Pokemon:
     name = table_row_soup.find_next("th").next_element.attrs["title"]
+    link_id = re.sub("[^a-z]", "", name.lower())
 
     # load Pokemon from JSON if it already exists
     json_filename = os.path.join(POKEMON_CACHE_DIRECTORY, name.lower() + ".json")
@@ -86,6 +89,7 @@ def extract_pokemon_from_table_row(table_row_soup: BeautifulSoup) -> Pokemon:
     img_filename = os.path.join(POKEMON_CACHE_DIRECTORY, name.lower() + ".png")
     return Pokemon(
         name=name,
+        link_id=link_id,
         index=index,
         html_url=html_url,
         img_url=img_url,
@@ -138,18 +142,18 @@ def extend_pokemon(p: Pokemon):
         soup = BeautifulSoup(r, "html.parser")
     content_soup: BeautifulSoup = soup.find(id="mw-content-text").contents[0]
 
-    # description
-    p_soup = content_soup.find("p")
-    description = []
-    while p_soup.name == "p":
-        description.append(p_soup.get_text())
-        p_soup = p_soup.next_sibling
-    p.description = "".join(description)
+    if not p.description:
+        p_soup = content_soup.find("p")
+        description = []
+        while p_soup.name == "p":
+            description.append(p_soup.get_text())
+            p_soup = p_soup.next_sibling
+        p.description = "".join(description)
 
-    # image
-    img_url = (
-        content_soup.find("table").find_next_sibling("table").find("img").attrs["src"]
-    )
-    img_url = img_url.replace("//", "https://")
-    p.img_url = img_url
-    download_to_file(img_url, p.img_filename)
+    if not os.path.isfile(p.img_filename):
+        img_url = (
+            content_soup.find("table").find_next_sibling("table").find("img").attrs["src"]
+        )
+        img_url = img_url.replace("//", "https://")
+        p.img_url = img_url
+        download_to_file(img_url, p.img_filename)

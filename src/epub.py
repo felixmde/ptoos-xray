@@ -23,7 +23,8 @@ def create_pokedex_chapter(pokemon: List[Pokemon]) -> epub.EpubHtml:
     content = ["<h1>Pokedex</h1>"]
 
     for p in pokemon:
-        content.append(f'<h2 id="{POKEMON_ID_PREFIX}{p.name.lower()}">{p.name}</h2>')
+        p_id = p.name.lower().replace(". ", "")
+        content.append(f'<h2 id="{POKEMON_ID_PREFIX}{p.link_id}">{p.name}</h2>')
         content.append(
             f'  <p><img alt="[Pokemon {p.name}]" src="../{p.img_filename}"/><br/></p>'
         )
@@ -39,25 +40,59 @@ def patch_chapter(chapter: epub.EpubHtml, pokemon_lookup: Dict[str, Pokemon]):
     r = re.compile("([:,.!?“”‘’… ]+)")
     soup: BeautifulSoup = BeautifulSoup(chapter.content, "html.parser")
 
-    def pokemon_name_to_link(key: str, word: str) -> Tag:
+    def pokemon_name_to_link(p: Pokemon, name_as_in_book: str) -> Tag:
         tag = soup.new_tag("a")
-        tag.string = word
-        tag.attrs["href"] = f"np_pokedex.xhtml#{POKEMON_ID_PREFIX}{key}"
-        tag.attrs["style"] = "color:black;text-decoration:none"
+        tag.string = name_as_in_book
+        tag.attrs["href"] = f"np_pokedex.xhtml#{POKEMON_ID_PREFIX}{p.link_id}"
+        # tag.attrs["style"] = "color:black;text-decoration:none"
         return tag
 
     def patch_string(section: NavigableString) -> List:
         """Replace Pokemon with link to Pokemon; requires splitting up the
         NavigableString into a list of NavigableStrings and Tags."""
         result = [[]]
-        for word in r.split(str(section)):
+        index, chunks = 0, r.split(str(section))
+        while index < len(chunks):
+            word = chunks[index]
             if word.lower() in pokemon_lookup:
-                pokemon_lookup[word.lower()].appears_in_book = True
-                link = pokemon_name_to_link(word.lower(), word)
+                p = pokemon_lookup[word.lower()]
+                p.appears_in_book = True
+                link = pokemon_name_to_link(p, word)
+                result.append(link)
+                result.append([])
+            elif word == "Mr" and index + 2 < len(chunks) and \
+                 chunks[index + 1] == ". " and chunks[index + 2] == "Mime":
+                # Handle "Mr. Mime" which is split into ["Mr", ". ", "Mime"]
+                p = pokemon_lookup["mr. mime"]
+                p.appears_in_book = True
+                name = "".join(chunks[index:index + 3])
+                link = pokemon_name_to_link(p, name)
+                index += 2
+                result.append(link)
+                result.append([])
+            elif word.lower() == "farfetch" and index + 2 < len(chunks) and \
+                 chunks[index + 1] == "’" and chunks[index + 2] == "d":
+                # Handle "farfetch'ed"
+                p = pokemon_lookup["farfetch'd"]
+                p.appears_in_book = True
+                name = "".join(chunks[index:index + 3])
+                link = pokemon_name_to_link(p, name)
+                index += 2
+                result.append(link)
+                result.append([])
+            elif word.lower() == "sirfetch" and index + 2 < len(chunks) and \
+                 chunks[index + 1] == "’" and chunks[index + 2] == "d":
+                # Handle "sirfetch'ed"
+                p = pokemon_lookup["sirfetch'd"]
+                p.appears_in_book = True
+                name = "".join(chunks[index:index + 3])
+                link = pokemon_name_to_link(p, name)
+                index += 2
                 result.append(link)
                 result.append([])
             else:
                 result[-1].append(word)
+            index += 1
 
         # convert words back into strings
         for i in range(len(result)):
@@ -81,6 +116,13 @@ def patch_chapter(chapter: epub.EpubHtml, pokemon_lookup: Dict[str, Pokemon]):
     chapter.content = str(soup)
 
 
+def get_pokemon_lookup(pokemon: List[Pokemon]) -> Dict[str, Pokemon]:
+    pokemon_lookup = {p.name.lower(): p for p in pokemon}
+    pokemon_lookup["nidoran"] = pokemon_lookup["nidoran♂"]
+    pokemon_lookup["barrierd"] = pokemon_lookup["mr. mime"]
+    return pokemon_lookup
+
+
 def patch(epub_filename: str, pokemon: List[Pokemon]):
     try:
         book = epub.read_epub(epub_filename)
@@ -88,7 +130,7 @@ def patch(epub_filename: str, pokemon: List[Pokemon]):
         logging.exception("Failed to open epub.")
         sys.exit(1)
 
-    pokemon_lookup = {p.name.lower(): p for p in pokemon}
+    pokemon_lookup = get_pokemon_lookup(pokemon)
     chapters = [
         b
         for b in book.get_items()
