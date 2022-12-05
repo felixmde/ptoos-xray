@@ -19,4 +19,6 @@ def main():
         ptoos_epub = "ptoos.epub"
         logging.warning(f"No epub file provided. Defaulting to '{ptoos_epub}'.")
     pokemon = src.pokemon.get_pokemon()
+    # for p in pokemon:
+    #     p.img_filename = p.img_filename.replace(".png", "-fs8.png")
     src.epub.patch(ptoos_epub, pokemon)

@@ -21,6 +21,10 @@ pipenv install --dev
 pipenv run pytest
 ```
 
+## Compress Pokemon PNGs
+
+Use `pngquant` to compress the PNGs and get a smaller epub file.
+
 ## Credits
 
 Full credit for the Pokemon names, images, and descriptions goes to

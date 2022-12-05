@@ -2,16 +2,31 @@ import ebooklib
 import logging
 import re
 import sys
+from dataclasses import dataclass
 from bs4 import BeautifulSoup, Tag
 from bs4.element import NavigableString
 from ebooklib import epub
 from src.pokemon import Pokemon
-from typing import List, Dict
+from typing import List, Dict, Optional
 from rich.progress import track
 from rich.console import Console
 
 POKEMON_ID_PREFIX = "pokemon-id-"
 POKEDEX_UID = "np_pokedex"
+
+
+@dataclass
+class AnnoyingPokemon:
+    name_chunks: List[str]
+    length_chunks: int
+    name_in_pokedex: str
+
+
+ANNOYING_POKEMON = [
+    AnnoyingPokemon(["Mr", ".", "Mime"], 3, "mr. mime"),
+    AnnoyingPokemon(["farfetch", "’", "d"], 3, "farfetch'd"),
+    AnnoyingPokemon(["sirfetch", "’", "d"], 3, "sirfetch'd"),
+]
 
 
 def create_pokedex_chapter(pokemon: List[Pokemon]) -> epub.EpubHtml:
@@ -36,74 +51,58 @@ def create_pokedex_chapter(pokemon: List[Pokemon]) -> epub.EpubHtml:
 
 
 def patch_chapter(chapter: epub.EpubHtml, pokemon_lookup: Dict[str, Pokemon]):
-    r = re.compile("([:,.!?“”‘’… ]+)")
+    special_chars_regex = re.compile("([:,.!?“”‘’… ]+)")
     soup: BeautifulSoup = BeautifulSoup(chapter.content, "html.parser")
 
-    def pokemon_name_to_link(p: Pokemon, name_as_in_book: str) -> Tag:
+    # Set to remember which Pokemon have already gotten a link for that
+    # chapter.
+    pokemon_added_for_chapter = set()
+
+    def pokemon_to_link(p: Pokemon, name_as_in_book: str) -> Tag:
         tag = soup.new_tag("a")
         tag.string = name_as_in_book
         tag.attrs["href"] = f"np_pokedex.xhtml#{POKEMON_ID_PREFIX}{p.link_id}"
         # tag.attrs["style"] = "color:black;text-decoration:none"
         return tag
 
+    def is_annoying_pokemon(index: int, chunks: List[str]) -> Optional[AnnoyingPokemon]:
+        for p in ANNOYING_POKEMON:
+            if p.name_chunks == list(
+                map(lambda s: s.lower(), chunks[index : index + p.length_chunks])
+            ):
+                return p
+        return None
+
     def patch_string(section: NavigableString) -> List:
         """Replace Pokemon with link to Pokemon; requires splitting up the
         NavigableString into a list of NavigableStrings and Tags."""
         result = [[]]
-        index, chunks = 0, r.split(str(section))
+        index, chunks = 0, special_chars_regex.split(str(section))
         while index < len(chunks):
             word = chunks[index]
+            pokemon: Optional[Pokemon] = None
+            increment: int = 1
+
             if word.lower() in pokemon_lookup:
-                p = pokemon_lookup[word.lower()]
-                p.appears_in_book = True
-                link = pokemon_name_to_link(p, word)
+                pokemon = pokemon_lookup[word.lower()]
+            elif annoying_pokemon := is_annoying_pokemon(index, chunks):
+                pokemon = pokemon_lookup[annoying_pokemon.name_in_pokedex]
+                increment = annoying_pokemon.length_chunks
+
+            if pokemon is not None and pokemon.name in pokemon_added_for_chapter:
+                pokemon = None
+
+            if pokemon is not None:
+                pokemon_added_for_chapter.add(pokemon.name)
+                pokemon.appears_in_book = True
+                name = "".join(chunks[index : index + increment])
+                link = pokemon_to_link(pokemon, name)
                 result.append(link)
                 result.append([])
-            elif (
-                word == "Mr"
-                and index + 2 < len(chunks)
-                and chunks[index + 1] == ". "
-                and chunks[index + 2] == "Mime"
-            ):
-                # Handle "Mr. Mime" which is split into ["Mr", ". ", "Mime"]
-                p = pokemon_lookup["mr. mime"]
-                p.appears_in_book = True
-                name = "".join(chunks[index : index + 3])
-                link = pokemon_name_to_link(p, name)
-                index += 2
-                result.append(link)
-                result.append([])
-            elif (
-                word.lower() == "farfetch"
-                and index + 2 < len(chunks)
-                and chunks[index + 1] == "’"
-                and chunks[index + 2] == "d"
-            ):
-                # Handle "farfetch'ed"
-                p = pokemon_lookup["farfetch'd"]
-                p.appears_in_book = True
-                name = "".join(chunks[index : index + 3])
-                link = pokemon_name_to_link(p, name)
-                index += 2
-                result.append(link)
-                result.append([])
-            elif (
-                word.lower() == "sirfetch"
-                and index + 2 < len(chunks)
-                and chunks[index + 1] == "’"
-                and chunks[index + 2] == "d"
-            ):
-                # Handle "sirfetch'ed"
-                p = pokemon_lookup["sirfetch'd"]
-                p.appears_in_book = True
-                name = "".join(chunks[index : index + 3])
-                link = pokemon_name_to_link(p, name)
-                index += 2
-                result.append(link)
-                result.append([])
+                index += increment
             else:
                 result[-1].append(word)
-            index += 1
+                index += 1
 
         # convert words back into strings
         for i in range(len(result)):
