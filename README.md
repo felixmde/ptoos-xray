@@ -1,7 +1,7 @@
 # ptoos-xray
 
-Script that annotates the Pokemon: the Origin of the Species e-book with links
-to descriptions and pictures of the Pokemon within the e-book itself. 
+Script that adds a Pokedex chapter to the *Pokemon: Origin of the Species* epub
+and links Pokemon to the respective section in that chapter.
 
 It works with the epub that you can download from [Daystar Eld's Patreon](https://www.patreon.com/daystareld/).
 
@@ -21,9 +21,16 @@ pipenv install --dev
 pipenv run pytest
 ```
 
-## Compress Pokemon PNGs
+## Pokemon download and compression
 
-Use `pngquant` to compress the PNGs and get a smaller epub file.
+The Pokemon information and pictures are part of the repository.
+
+To redownload the data delete the contents of the `pokemon` directory and run
+the script with the `--download` flag. This takes a while which is why I decided
+that checking in the data is a good idea.
+
+Install `pngquant` to compress the PNGs and get a smaller epub file. Thanks to 
+C0rn3j for suggesting that. The images are checked in in their compressed form.
 
 ## Credits
 

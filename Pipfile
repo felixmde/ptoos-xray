@@ -12,7 +12,11 @@ ebooklib = "*"
 pydantic = "*"
 requests = "*"
 rich = "*"
+lxml = "*"
 
 [dev-packages]
 black = "*"
 pytest = "*"
+types-requests = "*"
+mypy = "*"
+flake8 = "*"

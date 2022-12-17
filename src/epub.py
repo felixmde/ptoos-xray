@@ -1,7 +1,7 @@
-import ebooklib
 import logging
 import re
 import sys
+from pathlib import Path
 from dataclasses import dataclass
 from bs4 import BeautifulSoup, Tag
 from bs4.element import NavigableString
@@ -9,7 +9,6 @@ from ebooklib import epub
 from src.pokemon import Pokemon
 from typing import List, Dict, Optional
 from rich.progress import track
-from rich.console import Console
 
 POKEMON_ID_PREFIX = "pokemon-id-"
 POKEDEX_UID = "np_pokedex"
@@ -76,7 +75,7 @@ def patch_chapter(chapter: epub.EpubHtml, pokemon_lookup: Dict[str, Pokemon]):
     def patch_string(section: NavigableString) -> List:
         """Replace Pokemon with link to Pokemon; requires splitting up the
         NavigableString into a list of NavigableStrings and Tags."""
-        result = [[]]
+        result: List[List] = [[]]
         index, chunks = 0, special_chars_regex.split(str(section))
         while index < len(chunks):
             word = chunks[index]
@@ -121,7 +120,6 @@ def patch_chapter(chapter: epub.EpubHtml, pokemon_lookup: Dict[str, Pokemon]):
         paragraph.contents = contents
 
     for p_soup in soup.find_all("p"):
-        words_have_changed, words = False, []
         patch_paragraph(p_soup)
     chapter.content = str(soup)
 
@@ -133,7 +131,7 @@ def get_pokemon_lookup(pokemon: List[Pokemon]) -> Dict[str, Pokemon]:
     return pokemon_lookup
 
 
-def patch(epub_filename: str, pokemon: List[Pokemon]):
+def get_epub_with_pokedex(epub_filename: Path, pokemon: List[Pokemon]) -> epub.EpubBook:
     try:
         book = epub.read_epub(epub_filename)
     except Exception:
@@ -168,14 +166,9 @@ def patch(epub_filename: str, pokemon: List[Pokemon]):
         image_content = open(p.img_filename, "rb").read()
         img = epub.EpubItem(
             uid=p.name,
-            file_name=p.img_filename,
+            file_name=str(p.img_filename),
             media_type="image/png",
             content=image_content,
         )
         book.add_item(img)
-
-    console = Console()
-    epub_out = epub_filename.replace(".", "-with-links.")
-    with console.status(f"Writing {epub_out}"):
-        epub.write_epub(epub_out, book, {})
-    console.print(f"[green]✓[/green] [orange1]{epub_out}[/orange1] written")
+    return book
