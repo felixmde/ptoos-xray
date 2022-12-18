@@ -7,11 +7,12 @@ from bs4 import BeautifulSoup, Tag
 from bs4.element import NavigableString
 from ebooklib import epub
 from src.pokemon import Pokemon
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 from rich.progress import track
 
 POKEMON_ID_PREFIX = "pokemon-id-"
 POKEDEX_UID = "np_pokedex"
+SPECIAL_CHARS_REGEX = re.compile("([:,.!?“”‘’… ]+)")
 
 
 @dataclass
@@ -21,8 +22,15 @@ class AnnoyingPokemon:
     name_in_pokedex: str
 
 
+@dataclass
+class ChapterContext:
+    pokemon_lookup: Dict[str, Pokemon]
+    pokemon_added: Set[str]  # Set to only link Pokemon for first occurrence in chapter
+    chapter_soup: BeautifulSoup
+
+
 ANNOYING_POKEMON = [
-    AnnoyingPokemon(["Mr", ".", "Mime"], 3, "mr. mime"),
+    AnnoyingPokemon(["mr", ". ", "mime"], 3, "mr. mime"),
     AnnoyingPokemon(["farfetch", "’", "d"], 3, "farfetch'd"),
     AnnoyingPokemon(["sirfetch", "’", "d"], 3, "sirfetch'd"),
 ]
@@ -49,79 +57,80 @@ def create_pokedex_chapter(pokemon: List[Pokemon]) -> epub.EpubHtml:
     return chapter
 
 
-def patch_chapter(chapter: epub.EpubHtml, pokemon_lookup: Dict[str, Pokemon]):
-    special_chars_regex = re.compile("([:,.!?“”‘’… ]+)")
-    soup: BeautifulSoup = BeautifulSoup(chapter.content, "html.parser")
+def pokemon_to_link(p: Pokemon, name_as_in_book: str, ctx: ChapterContext) -> Tag:
+    tag = ctx.chapter_soup.new_tag("a")
+    tag.string = name_as_in_book
+    tag.attrs["href"] = f"np_pokedex.xhtml#{POKEMON_ID_PREFIX}{p.link_id}"
+    return tag
 
-    # Set to remember which Pokemon have already gotten a link for that
-    # chapter.
-    pokemon_added_for_chapter = set()
 
-    def pokemon_to_link(p: Pokemon, name_as_in_book: str) -> Tag:
-        tag = soup.new_tag("a")
-        tag.string = name_as_in_book
-        tag.attrs["href"] = f"np_pokedex.xhtml#{POKEMON_ID_PREFIX}{p.link_id}"
-        # tag.attrs["style"] = "color:black;text-decoration:none"
-        return tag
+def is_annoying_pokemon(index: int, chunks: List[str]) -> Optional[AnnoyingPokemon]:
+    for p in ANNOYING_POKEMON:
+        if p.name_chunks == list(
+            map(lambda s: s.lower(), chunks[index:index + p.length_chunks])
+        ):
+            return p
+    return None
 
-    def is_annoying_pokemon(index: int, chunks: List[str]) -> Optional[AnnoyingPokemon]:
-        for p in ANNOYING_POKEMON:
-            if p.name_chunks == list(
-                map(lambda s: s.lower(), chunks[index : index + p.length_chunks])
-            ):
-                return p
-        return None
 
-    def patch_string(section: NavigableString) -> List:
-        """Replace Pokemon with link to Pokemon; requires splitting up the
-        NavigableString into a list of NavigableStrings and Tags."""
-        result: List[List] = [[]]
-        index, chunks = 0, special_chars_regex.split(str(section))
-        while index < len(chunks):
-            word = chunks[index]
-            pokemon: Optional[Pokemon] = None
-            increment: int = 1
+def patch_string(section: NavigableString, ctx: ChapterContext) -> List:
+    """Replace Pokemon with link to Pokemon; requires splitting up the
+    NavigableString into a list of NavigableStrings and Tags."""
+    result: List[List] = [[]]
+    index, chunks = 0, SPECIAL_CHARS_REGEX.split(str(section))
+    while index < len(chunks):
+        word = chunks[index]
+        pokemon: Optional[Pokemon] = None
+        increment: int = 1
 
-            if word.lower() in pokemon_lookup:
-                pokemon = pokemon_lookup[word.lower()]
-            elif annoying_pokemon := is_annoying_pokemon(index, chunks):
-                pokemon = pokemon_lookup[annoying_pokemon.name_in_pokedex]
-                increment = annoying_pokemon.length_chunks
+        if word.lower() in ctx.pokemon_lookup:
+            pokemon = ctx.pokemon_lookup[word.lower()]
+        elif annoying_pokemon := is_annoying_pokemon(index, chunks):
+            pokemon = ctx.pokemon_lookup[annoying_pokemon.name_in_pokedex]
+            increment = annoying_pokemon.length_chunks
 
-            if pokemon is not None and pokemon.name in pokemon_added_for_chapter:
-                pokemon = None
+        if pokemon is not None and pokemon.name in ctx.pokemon_added:
+            pokemon = None
 
-            if pokemon is not None:
-                pokemon_added_for_chapter.add(pokemon.name)
-                pokemon.appears_in_book = True
-                name = "".join(chunks[index : index + increment])
-                link = pokemon_to_link(pokemon, name)
-                result.append(link)
-                result.append([])
-                index += increment
-            else:
-                result[-1].append(word)
-                index += 1
+        if pokemon is not None:
+            ctx.pokemon_added.add(pokemon.name)
+            pokemon.appears_in_book = True
+            name = "".join(chunks[index:index + increment])
+            link = pokemon_to_link(pokemon, name, ctx)
+            result.append(link)
+            result.append([])
+            index += increment
+        else:
+            result[-1].append(word)
+            index += 1
 
-        # convert words back into strings
-        for i in range(len(result)):
-            if isinstance(result[i], list):
-                result[i] = NavigableString("".join(result[i]))
-        return result
+    # convert words back into strings
+    for i in range(len(result)):
+        if isinstance(result[i], list):
+            result[i] = NavigableString("".join(result[i]))
+    return result
 
-    def patch_paragraph(paragraph: Tag):
-        contents = []
-        for section in paragraph.contents:
-            if isinstance(section, NavigableString):
-                contents += patch_string(section)
-            else:
-                patch_paragraph(section)
-                contents.append(section)
-        paragraph.contents = contents
 
-    for p_soup in soup.find_all("p"):
-        patch_paragraph(p_soup)
-    chapter.content = str(soup)
+def patch_paragraph(paragraph: Tag, ctx: ChapterContext):
+    contents = []
+    for section in paragraph.contents:
+        if isinstance(section, NavigableString):
+            contents += patch_string(section, ctx)
+        else:
+            patch_paragraph(section, ctx)
+            contents.append(section)
+    paragraph.contents = contents
+
+
+def patch_chapter(chapter_soup: BeautifulSoup, pokemon_lookup: Dict[str, Pokemon]) -> str:
+    ctx = ChapterContext(
+        pokemon_lookup=pokemon_lookup,
+        pokemon_added=set(),
+        chapter_soup=chapter_soup,
+    )
+    for p_soup in chapter_soup.find_all("p"):
+        patch_paragraph(p_soup, ctx)
+    return str(chapter_soup)
 
 
 def get_pokemon_lookup(pokemon: List[Pokemon]) -> Dict[str, Pokemon]:
@@ -150,8 +159,9 @@ def get_epub_with_pokedex(epub_filename: Path, pokemon: List[Pokemon]) -> epub.E
         logging.warning(f"It looks like '{epub_filename}' already has a Pokedex.")
         sys.exit(1)
 
-    for c in track(chapters, description="Add Pokemon links to chapters"):
-        patch_chapter(c, pokemon_lookup)
+    for chapter in track(chapters, description="Add Pokemon links to chapters"):
+        chapter_soup = BeautifulSoup(chapter.content, "html.parser")
+        chapter.content = patch_chapter(chapter_soup, pokemon_lookup)
 
     # only add Pokemon to Pokedex chapter that appear (in the book)
     pokemon = [p for p in pokemon if p.appears_in_book]
